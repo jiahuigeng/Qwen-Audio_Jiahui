@@ -1,0 +1,7 @@
+.idea/
+__pycache__/
+exps/
+input_audios.bin
+input_ids.bin
+predict_noaudio.py
+requirements1.txt
