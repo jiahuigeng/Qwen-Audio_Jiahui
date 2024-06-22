@@ -5,12 +5,13 @@ from transformers import PreTrainedTokenizer, GenerationConfig, StoppingCriteria
 from transformers.generation import GenerationConfig
 import torch
 import argparse
-import torch.nn as nn
-import torch.optim as optim
-from utils import get_logger
+import os
+import pandas as pd
 import pickle
 from typing import Tuple, List, Union, Iterable, Dict
 from qwen_generation_utils import decode_tokens
+from utils import get_target_data
+
 torch.manual_seed(1234)
 audio_embed_file = f"audio_embed.bin"
 tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen-Audio-Chat", trust_remote_code=True)
@@ -120,129 +121,74 @@ def make_context(
 
 
 def main(args):
-    logger = get_logger("logs/")
-    target_prompt = None
-    # if args.task == "trans":
 
+    target_prompts = get_target_data(args.task)
 
-    #
-    # input_embeds = model.transformer.wte(torch.tensor(input_ids).to("cuda"))
-    # tfd_audio_tensor = torch.randn(tfd_audio_shape).to("cuda").requires_grad_(True)
+    to_save_folder = "results"
+    if not os.path.exists(to_save_folder):
+        os.makedirs(to_save_folder)
+    to_save_file = os.path.join(to_save_folder, args.task + "_qwen.csv")
+    audio_info = None
+    kwargs = dict()
+    kwargs['audio_info'] = audio_info
 
-    raw_text = """<|im_start|>system
-You are a helpful assistant.<|im_end|>
-<|im_start|>user
-Audio 1:<audio>assets/audio/1272-128104-0000.flac</audio>
-translate the following sentence to English:<|im_end|>
-<|im_start|>assistant
-"""
+    stop_words_ids = [[151645], [151644]]
+    generation_config = model.generation_config
 
-    target_prompt = trans_prompt
-    input_ids = tokenizer.encode(target_prompt)
-    input_embeds = model.transformer.wte(torch.tensor(input_ids).to("cuda"))
+    # input_ids = pickle.load(open("input_ids.bin", 'rb')).to(model.device)
 
-    audio_shape = (1, 80, 3000)
-    input_audio_lengths = torch.tensor([[293, 146]])
-    audio_span_tokens = [148]
-    audio_tensor = torch.randn(audio_shape).to(device).requires_grad_(True)
+    # results = dict()
+    results = pd.DataFrame()
+    total_prompts = []
+    total_preds = []
 
+    for idx, prompt in enumerate(target_prompts):
+        query = tokenizer.from_list_format([
+            {'audio': 'assets/audio/1272-128104-0000.flac'},  # Either a local path or an url
+            {'text': prompt},
+        ])
 
-    optimizer = optim.Adam([audio_tensor], lr=args.lr)
-    cos_loss_fun = nn.CosineEmbeddingLoss()
+        raw_text, context_tokens = make_context(tokenizer, query)
 
-    model.train()
-    for param in model.parameters():
-        param.requires_grad = False
+        input_ids = torch.tensor([context_tokens]).to(device)
+        outputs = model.generate(
+            input_ids,
+            stop_words_ids=stop_words_ids,
+            return_dict_in_generate=False,
+            generation_config=generation_config,
+            **kwargs,
+        )
 
-    for step in range(args.num_steps):  # May need more iterations for Adam
-        print(step)
-        optimizer.zero_grad()
-        audio_embedding = model.transformer.audio.encode(audio_tensor, input_audio_lengths, audio_span_tokens)
+        response = decode_tokens(
+            outputs[0],
+            tokenizer,
+            raw_text_len=len(raw_text),
+            context_length=len(context_tokens),
+            chat_format=generation_config.chat_format,
+            verbose=False,
+            errors='replace',
+            audio_info=None
+            # audio_info=audio_info
+        )
 
-        loss = None
+        print("idx", "response:", response)
 
-        len_prompt_token = input_embeds.shape[1]
-        target_ones = torch.ones(padded_input_embeds.shape[1])[-len_prompt_token:].to("cuda")
-        part_prompt_embeds = padded_input_embeds[0][-len_prompt_token:].to("cuda")
-        part_image_embeds = image_embeds[0][-len_prompt_token:].to("cuda")
-
-        if args.loss == "l2":
-            loss = ((part_image_embeds - part_prompt_embeds) ** 2).mean()
-        elif args.loss == "cosine":
-            loss = cos_loss_fun(part_image_embeds, part_prompt_embeds, target_ones)
-        elif args.loss == "both":
-            l2_loss = ((part_image_embeds - part_prompt_embeds) ** 2).mean()
-            cos_loss = cos_loss_fun(part_image_embeds, part_prompt_embeds, target_ones)
-            loss = l2_loss + cos_loss
-        loss.backward(retain_graph=True)
-        optimizer.step()
-
-        if step % int(args.num_steps / args.num_saves) == 0:
-
-
-            logger.info("Step {}, Loss: {}".format(step, loss.item()))
-
-    # input_audios = pickle.load(open("input_audios.bin", 'rb')).to(model.device)
-    # audio_info = {
-    #     "input_audios": input_audios,
-    #     "input_audio_lengths": input_audio_lengths,
-    #     "audio_span_tokens": audio_span_tokens,
-    #     'audio_urls': ['assets/audio/1272-128104-0001.flac']
-    # }
-    # kwargs = dict()
-    # kwargs['audio_info'] = audio_info
-    # stop_words_ids = [[151645], [151644]]
-    # generation_config = model.generation_config
-    #
-    # # input_ids = pickle.load(open("input_ids.bin", 'rb')).to(model.device)
-    #
-    # query = tokenizer.from_list_format([
-    #     {'audio': 'assets/audio/1272-128104-0000.flac'},  # Either a local path or an url
-    #     {'text': " "},
-    # ])
-    #
-    # raw_text, context_tokens = make_context(tokenizer, query)
-    # input_ids = torch.tensor([context_tokens]).to(device)
-    # outputs = model.generate(
-    #     input_ids,
-    #     stop_words_ids=stop_words_ids,
-    #     return_dict_in_generate=False,
-    #     generation_config=generation_config,
-    #     **kwargs,
-    # )
-    #
-    # response = decode_tokens(
-    #     outputs[0],
-    #     tokenizer,
-    #     raw_text_len=len(raw_text),
-    #     context_length=len(context_tokens),
-    #     chat_format=generation_config.chat_format,
-    #     verbose=False,
-    #     errors='replace',
-    #     audio_info=audio_info
-    # )
-    #
-    # print("response", response)
-
-
-
+        total_prompts.append(prompt)
+        total_preds.append(response)
+        # results[idx] = {"prompt": prompt,
+        #                 "pred": response}
+    results["prompt"] = total_prompts
+    results["response"] = total_preds
+    results.to_csv(to_save_file)
 
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", type=str, default="trans")
+    parser.add_argument("--task", type=str, default="safebench")
     # parser.add_argument("")
 
 
     args = parser.parse_args()
     main(args)
-
-
-
-
-# convert audio to mel spectrogram
-
-# convert spectrogram to audio
-
 

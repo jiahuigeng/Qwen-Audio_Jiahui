@@ -253,7 +253,8 @@ def _decode_chatml(
             end_reason = f"Gen {tokenizer.decode([tokens[eod_token_idx]],**kwargs)!r}"
             break
 
-    trim_decode_tokens = tokenizer.decode(tokens[:eod_token_idx], errors=errors, **kwargs)[raw_text_len:]
+    # trim_decode_tokens = tokenizer.decode(tokens[:eod_token_idx], errors=errors, **kwargs)[raw_text_len:]
+    trim_decode_tokens = tokenizer.decode(tokens[:eod_token_idx], errors=errors, **kwargs).split("<|im_start|>assistant\n")[1]
     if verbose:
         print("\nRaw Generate w/o EOD:", tokenizer.decode(tokens, errors=errors, **kwargs)[raw_text_len:])
         print("\nRaw Generate:", trim_decode_tokens)
