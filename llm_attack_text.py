@@ -128,6 +128,14 @@ def main(args):
     if not os.path.exists(to_save_folder):
         os.makedirs(to_save_folder)
     to_save_file = os.path.join(to_save_folder, args.task + "_qwen.csv")
+
+    if os.path.exists(to_save_file):
+        results = pd.read_csv(to_save_file)
+    else:
+        results = pd.DataFrame()
+        results["prompt"] = None
+        results["pred"] = None
+
     audio_info = None
     kwargs = dict()
     kwargs['audio_info'] = audio_info
@@ -135,21 +143,22 @@ def main(args):
     stop_words_ids = [[151645], [151644]]
     generation_config = model.generation_config
 
-    # input_ids = pickle.load(open("input_ids.bin", 'rb')).to(model.device)
 
-    # results = dict()
-    results = pd.DataFrame()
-    total_prompts = []
-    total_preds = []
+    # total_prompts = []
+    # total_preds = []
 
     for idx, prompt in enumerate(target_prompts):
+        print(idx)
+        # if idx > 3:
+        #     break
+        if prompt in results["prompt"].tolist():
+            continue
         query = tokenizer.from_list_format([
             {'audio': 'assets/audio/1272-128104-0000.flac'},  # Either a local path or an url
             {'text': prompt},
         ])
 
         raw_text, context_tokens = make_context(tokenizer, query)
-
         input_ids = torch.tensor([context_tokens]).to(device)
         outputs = model.generate(
             input_ids,
@@ -173,13 +182,9 @@ def main(args):
 
         print("idx", "response:", response)
 
-        total_prompts.append(prompt)
-        total_preds.append(response)
-        # results[idx] = {"prompt": prompt,
-        #                 "pred": response}
-    results["prompt"] = total_prompts
-    results["response"] = total_preds
-    results.to_csv(to_save_file)
+        results.at[idx, "prompt"] = prompt
+        results.at[idx, "pred"] = response
+        results.to_csv(to_save_file, index=False)
 
 
 if __name__ == "__main__":
