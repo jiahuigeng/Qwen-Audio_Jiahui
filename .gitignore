@@ -8,3 +8,4 @@ requirements1.txt
 modeling_qwen1.py
 tokenization_qwen1.py
 results
+logs
