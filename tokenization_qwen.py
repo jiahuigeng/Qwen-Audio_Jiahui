@@ -17,9 +17,7 @@ from typing import Collection, Dict, List, Set, Tuple, Union, Any, Callable, Opt
 
 import tiktoken
 import numpy as np
-from PIL import Image
-from PIL import ImageFont
-from PIL import ImageDraw
+
 from transformers import PreTrainedTokenizer, AddedToken
 from transformers.utils import try_to_load_from_cache
 from transformers.tokenization_utils_base import BatchEncoding, PaddingStrategy, TruncationStrategy, \
@@ -46,7 +44,7 @@ SPECIAL_TOKENS = (
                      IMSTART,
                      IMEND,
                  ) + EXTRAS
-IMG_TOKEN_SPAN = 256
+
 LANGUAGES = {
     "en": "english",
     "zh": "chinese",
@@ -83,7 +81,7 @@ def _replace_closed_tag(
         input_tokens: List[Any],
         start_tags: Union[Any, Tuple[Any]],
         end_tags: Union[Any, Tuple[Any]],
-        inclusive_replace_func: Callable,
+        inclusive_replace_func: Callable = None,
         exclusive_replace_func: Callable = lambda x: x,
         audio_info: Dict = None
 ):
@@ -104,8 +102,9 @@ def _replace_closed_tag(
         tag_idx = start_tags.index(input_tokens[start])
         end = _list_find(input_tokens, (end_tags[tag_idx],), start)
         if end == -1:
-            raise ValueError("Unclosed image token")
-        output_tokens.extend(inclusive_replace_func(input_tokens[start: end + 1], audio_info, audio_idx))
+            raise ValueError("Unclosed audio token")
+        if inclusive_replace_func:
+            output_tokens.extend(inclusive_replace_func(input_tokens[start: end + 1], audio_info, audio_idx))
         end += 1
         audio_idx += 1
     output_tokens.extend(exclusive_replace_func(input_tokens[end:]))
@@ -273,7 +272,7 @@ class QWenTokenizer(PreTrainedTokenizer):
             raise ValueError('Adding regular tokens is not supported')
         for token in new_tokens:
             surface_form = token.content if isinstance(token, AddedToken) else token
-            if surface_form not in SPECIAL_TOKENS + self.IMAGE_ST + self.AUDIO_ST:
+            if surface_form not in SPECIAL_TOKENS  + self.AUDIO_ST:
                 raise ValueError('Adding unknown special tokens is not supported')
         return 0
 
@@ -333,8 +332,12 @@ class QWenTokenizer(PreTrainedTokenizer):
             out_audio_tokens = [self.audio_start_tag] + [self.audio_pad_tag] * (audio_token_span - 2) + [
                 self.audio_end_tag]
             return out_audio_tokens
-
-        return _replace_closed_tag(tokens, self.audio_start_tag, self.audio_end_tag, _encode_audiourl,
+        
+        if audio_info:
+            return _replace_closed_tag(tokens, self.audio_start_tag, self.audio_end_tag, _encode_audiourl,
+                                   audio_info=audio_info)
+        else:
+            return _replace_closed_tag(tokens, self.audio_start_tag, self.audio_end_tag,
                                    audio_info=audio_info)
 
     def _batch_encode_plus(
@@ -490,9 +493,12 @@ class QWenTokenizer(PreTrainedTokenizer):
             audio_url = audio_info["audio_urls"][audio_idx]
             return [self.audio_start_id] + self.tokenizer.encode(audio_url) + [self.audio_end_id]
 
-        token_ids = _replace_closed_tag(token_ids, self.audio_start_id, self.audio_end_id, _decode_audiourl,
-                                        audio_info=audio_info)
-
+        if audio_info:
+            token_ids = _replace_closed_tag(token_ids, self.audio_start_id, self.audio_end_id, _decode_audiourl,
+                                            audio_info=audio_info)
+        else:
+            token_ids = _replace_closed_tag(token_ids, self.audio_start_id, self.audio_end_id, None,
+                                            audio_info=audio_info)
         if skip_special_tokens:
             token_ids = [i for i in token_ids if i < self.eod_id]
         return self.tokenizer.decode(token_ids, errors=errors or self.errors)
@@ -500,7 +506,7 @@ class QWenTokenizer(PreTrainedTokenizer):
     def to_list_format(self, text: str):
         text = unicodedata.normalize("NFC", text)
         token_ids = self.tokenizer.encode(
-            text, allowed_special=set(self.IMAGE_ST + self.AUDIO_ST + (ENDOFTEXT,)))
+            text, allowed_special=set(self.AUDIO_ST + (ENDOFTEXT,)))
 
         def _encode_audio_info(tokens):
             if len(tokens) == 0:

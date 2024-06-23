@@ -5,3 +5,5 @@ input_audios.bin
 input_ids.bin
 predict_noaudio.py
 requirements1.txt
+modeling_qwen1.py
+tokenization_qwen1.py

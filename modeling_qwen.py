@@ -21,6 +21,8 @@ from torch.nn import CrossEntropyLoss
 from transformers import PreTrainedTokenizer, GenerationConfig, StoppingCriteriaList
 from transformers.generation.logits_process import LogitsProcessorList
 
+import pickle
+
 if TYPE_CHECKING:
     from transformers.generation.streamers import BaseStreamer
 from transformers.generation.utils import GenerateOutput
@@ -767,6 +769,10 @@ class QWenModel(QWenPreTrainedModel):
                 audio_span_tokens = audio_info["audio_span_tokens"]
                 input_audio_lengths = audio_info["input_audio_lengths"]
                 audios = self.audio.encode(audios,input_audio_lengths, audio_span_tokens)
+                
+            elif not audio_info:
+                audios = None
+                
             else:
                 audios = torch.concat([_["input_audios"] for _ in audio_info])
                 input_audio_lengths = torch.concat([_["input_audio_lengths"] for _ in audio_info])
@@ -774,6 +780,7 @@ class QWenModel(QWenPreTrainedModel):
                 for _ in audio_info:
                     audio_span_tokens.extend(_['audio_span_tokens'])
                 audios = self.audio.encode(audios, input_audio_lengths, audio_span_tokens)
+                
 
         else:
             audios = None
@@ -1027,7 +1034,6 @@ class QWenLMHeadModel(QWenPreTrainedModel):
         if os.path.isdir(pretrained_model_name_or_path):
             # Local Directory of Models
             mel_filters_path = os.path.join(pretrained_model_name_or_path, 'mel_filters.npz')
-            print(mel_filters_path)
             tgt_cache_path = os.path.join(os.path.dirname(__file__), 'mel_filters.npz')
             shutil.copy(mel_filters_path, tgt_cache_path)
         else:
@@ -1196,11 +1202,14 @@ class QWenLMHeadModel(QWenPreTrainedModel):
             max_window_size=max_window_size,
             chat_format=generation_config.chat_format,
         )
-
+        pickle.dump(audio_info["input_audios"].detach().cpu(), open(r'C:\Users\janga\Downloads\input_audios.bin', "wb"))
+        print("input_audios saved")
         stop_words_ids.extend(get_stop_words_ids(
             generation_config.chat_format, tokenizer
         ))
         input_ids = torch.tensor([context_tokens]).to(self.device)
+        pickle.dump(input_ids.detach().cpu(), open(r'C:\Users\janga\Downloads\input_ids.bin', "wb"))
+        print("input_ids saved")
         kwargs['audio_info'] = audio_info
         outputs = self.generate(
                     input_ids,
