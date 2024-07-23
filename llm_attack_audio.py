@@ -248,10 +248,10 @@ def main(args):
                     {'text': args.suffix},
                 ])
 
-                raw_text, context_tokens = make_context(tokenizer, query)
-                input_ids = torch.tensor([context_tokens]).to(device)
-                outputs = model.generate(
-                    input_ids,
+                raw_text, context_tokens = make_context(tokenizer, suffix_query)
+                suffix_input_ids = torch.tensor([context_tokens]).to(device)
+                suffix_outputs = model.generate(
+                    suffix_input_ids,
                     stop_words_ids=stop_words_ids,
                     return_dict_in_generate=False,
                     generation_config=generation_config,
@@ -259,7 +259,7 @@ def main(args):
                 )
 
                 suffix_response = decode_tokens(
-                    outputs[0],
+                    suffix_outputs[0],
                     tokenizer,
                     raw_text_len=len(raw_text),
                     context_length=len(context_tokens),
