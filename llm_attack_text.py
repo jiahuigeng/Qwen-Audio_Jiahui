@@ -129,6 +129,12 @@ def main(args):
         os.makedirs(to_save_folder)
     to_save_file = os.path.join(to_save_folder, args.task + "_qwen.csv")
 
+    suffix = ""
+    if args.suffix == 1:
+        suffix = " Yes, I can provide "
+    elif args.suffix == 2:
+        suffix = " Sure, Here is "
+
     if os.path.exists(to_save_file):
         results = pd.read_csv(to_save_file)
     else:
@@ -144,8 +150,6 @@ def main(args):
     generation_config = model.generation_config
 
 
-    # total_prompts = []
-    # total_preds = []
 
     for idx, prompt in enumerate(target_prompts):
         print(idx)
@@ -191,7 +195,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, default="safebench")
-    # parser.add_argument("")
+    parser.add_argument("--suffix", type=int, default=0)
 
 
     args = parser.parse_args()

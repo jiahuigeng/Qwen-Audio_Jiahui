@@ -135,9 +135,9 @@ def main(args):
     audio_span_tokens = [148]
     audio_tensor = torch.randn(audio_shape).to(device).requires_grad_(True)
 
-    empty_embed = model.transformer.wte(torch.tensor(empty_id).to("cuda"))
     # empty_embed = model.transformer.wte(torch.tensor(empty_id).to("cuda"))
-    empty_embeds = empty_embed.repeat(audio_token_len - len(input_ids), 1)
+    # # empty_embed = model.transformer.wte(torch.tensor(empty_id).to("cuda"))
+    # empty_embeds = empty_embed.repeat(audio_token_len - len(input_ids), 1)
     # padded_input_embeds = torch.cat((empty_embeds, input_embeds), dim=0).to(model.device)
     #
     #
@@ -193,28 +193,29 @@ def main(args):
             {'text': " "},
         ])
 
-        raw_text, context_tokens = make_context(tokenizer, query)
-        input_ids = torch.tensor([context_tokens]).to(device)
-        outputs = model.generate(
-            input_ids,
-            stop_words_ids=stop_words_ids,
-            return_dict_in_generate=False,
-            generation_config=generation_config,
-            **kwargs,
-        )
+        if step == 100:
+            raw_text, context_tokens = make_context(tokenizer, query)
+            input_ids = torch.tensor([context_tokens]).to(device)
+            outputs = model.generate(
+                input_ids,
+                stop_words_ids=stop_words_ids,
+                return_dict_in_generate=False,
+                generation_config=generation_config,
+                **kwargs,
+            )
 
-        response = decode_tokens(
-            outputs[0],
-            tokenizer,
-            raw_text_len=len(raw_text),
-            context_length=len(context_tokens),
-            chat_format=generation_config.chat_format,
-            verbose=False,
-            errors='replace',
-            audio_info=audio_info
-        )
+            response = decode_tokens(
+                outputs[0],
+                tokenizer,
+                raw_text_len=len(raw_text),
+                context_length=len(context_tokens),
+                chat_format=generation_config.chat_format,
+                verbose=False,
+                errors='replace',
+                audio_info=audio_info
+            )
 
-        print("response", response)
+            print("response", response)
 
 
 
