@@ -193,7 +193,7 @@ def main(args):
             {'text': " "},
         ])
 
-        if step % 100 == 0:
+        if step % 200 == 0:
             raw_text, context_tokens = make_context(tokenizer, query)
             input_ids = torch.tensor([context_tokens]).to(device)
             outputs = model.generate(
