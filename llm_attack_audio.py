@@ -287,7 +287,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-steps", type=int, default=4001)
     parser.add_argument("--num-saves", type=int, default=10)
     parser.add_argument("--loss", type=str, default="both")
-    parser.add_argument("--suffix", type=str, default=" ")
+    parser.add_argument("--suffix", type=str, default="Yes, I can provide ")
 
     # parser.add_argument("")
 
