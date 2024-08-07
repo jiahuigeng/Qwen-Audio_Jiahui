@@ -121,6 +121,8 @@ def make_context(
 
     return raw_text, context_tokens
 
+def get_name(tpr, idx):
+    return f"{tpr}_{idx}_pred"
 
 def main(args):
     logger = get_logger("logs/attack_test")
@@ -133,9 +135,10 @@ def main(args):
         os.makedirs(exp_folder)
 
     save_folder = os.path.join(exp_folder, "_".join([args.task, str(args.num_steps)]))
-    save_file = os.path.join(save_folder, "results.csv")
+    save_file = os.path.join(save_folder, "results_multi.csv")
     if not os.path.exists(save_folder):
         os.makedirs(save_folder, exist_ok=True)
+
 
     dataset = get_target_data(args.task)
 
@@ -150,13 +153,19 @@ def main(args):
     # step_ll = []
     # pred_ll = []
     # suffix_pred_ll = []
-
-    df = pd.DataFrame(columns=["prompt", "step", "pred", "suffix_pred"])
+    if not os.path.exists(save_file):
+        titles = ["prompt", "step"]
+        for tpr in [0.01, 0.05, 0.1, 0.2, 0.5, 0.8]:
+            for i in range(args.n_samples):
+                titles.append(get_name(tpr, i))
+        df = pd.DataFrame(columns=titles)
+        # df = pd.DataFrame(columns=["prompt", "step", "pred", "suffix_pred"])
+    else:
+        df = pd.read_csv(save_file)
 
     cnt = 0
+    generation_config = model.generation_config
     for idx, target_prompt in enumerate(dataset):
-
-
         input_ids = tokenizer.encode(target_prompt)
         input_embeds = model.transformer.wte(torch.tensor(input_ids).to("cuda"))
 
@@ -171,7 +180,6 @@ def main(args):
         model.train()
         for param in model.parameters():
             param.requires_grad = False
-
 
         for step in range(args.num_steps):  # May need more iterations for Adam
             print(step)
@@ -209,72 +217,42 @@ def main(args):
             kwargs = dict()
             kwargs['audio_info'] = audio_info
             stop_words_ids = [[151645], [151644]]
-            generation_config = model.generation_config
 
-            if step % int(args.num_steps/args.num_saves) == 0:
-                query = tokenizer.from_list_format([
-                    {'audio': 'assets/audio/1272-128104-0000.flac'},  # Either a local path or an url
-                    {'text': " "},
-                ])
+            if step % int(args.num_steps/args.num_saves) == 0 and step >= 2000:
+                for tpr in [0.01, 0.05, 0.1, 0.2, 0.5, 0.8]:
+                    generation_config.temperature = tpr
+                    for i in range(args.n_samples):
+                        suffix_query = tokenizer.from_list_format([
+                            {'audio': 'assets/audio/1272-128104-0000.flac'},  # Either a local path or an url
+                            {'text': args.suffix},
+                        ])
 
-                raw_text, context_tokens = make_context(tokenizer, query)
-                input_ids = torch.tensor([context_tokens]).to(device)
-                outputs = model.generate(
-                    input_ids,
-                    stop_words_ids=stop_words_ids,
-                    return_dict_in_generate=False,
-                    generation_config=generation_config,
-                    **kwargs,
-                )
+                        raw_text, context_tokens = make_context(tokenizer, suffix_query)
+                        suffix_input_ids = torch.tensor([context_tokens]).to(device)
 
-                response = decode_tokens(
-                    outputs[0],
-                    tokenizer,
-                    raw_text_len=len(raw_text),
-                    context_length=len(context_tokens),
-                    chat_format=generation_config.chat_format,
-                    verbose=False,
-                    errors='replace',
-                    audio_info=audio_info
-                )
+                        suffix_outputs = model.generate(
+                            suffix_input_ids,
+                            stop_words_ids=stop_words_ids,
+                            return_dict_in_generate=False,
+                            generation_config=generation_config,
+                            **kwargs,
+                        )
 
-                print("response", response)
-
-                df.at[cnt, "prompt"] = target_prompt
-                df.at[cnt, "step"] = step
-                df.at[cnt, "pred"] = response
-                suffix_query = tokenizer.from_list_format([
-                    {'audio': 'assets/audio/1272-128104-0000.flac'},  # Either a local path or an url
-                    {'text': args.suffix},
-                ])
-
-                raw_text, context_tokens = make_context(tokenizer, suffix_query)
-                suffix_input_ids = torch.tensor([context_tokens]).to(device)
-                suffix_outputs = model.generate(
-                    suffix_input_ids,
-                    stop_words_ids=stop_words_ids,
-                    return_dict_in_generate=False,
-                    generation_config=generation_config,
-                    **kwargs,
-                )
-
-                suffix_response = decode_tokens(
-                    suffix_outputs[0],
-                    tokenizer,
-                    raw_text_len=len(raw_text),
-                    context_length=len(context_tokens),
-                    chat_format=generation_config.chat_format,
-                    verbose=False,
-                    errors='replace',
-                    audio_info=audio_info
-                )
-                print("suffix response", suffix_response)
-                df.at[cnt, "suffix_pred"] = suffix_response
+                        suffix_response = decode_tokens(
+                            suffix_outputs[0],
+                            tokenizer,
+                            raw_text_len=len(raw_text),
+                            context_length=len(context_tokens),
+                            chat_format=generation_config.chat_format,
+                            verbose=False,
+                            errors='replace',
+                            audio_info=audio_info
+                        )
+                        print(f"tpr: {tpr}, samp idx: {i},  suffix response: {suffix_response}")
+                        df.at[cnt, get_name(tpr, i)] = suffix_response
 
                 df.to_csv(save_file, index=False)
                 cnt += 1
-
-
 
 
 
@@ -288,6 +266,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-saves", type=int, default=10)
     parser.add_argument("--loss", type=str, default="both")
     parser.add_argument("--suffix", type=str, default=" Yes, I can provide ")
+    parser.add_argument("--n-samples", type=int, default=1)
 
     # parser.add_argument("")
 
