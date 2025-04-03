@@ -155,6 +155,8 @@ def main(args):
     cnt = 0
 
     for idx, target_prompt in enumerate(dataset):
+        if idx > 52:
+            break
         input_ids = tokenizer.encode(target_prompt)
         input_embeds = model.transformer.wte(torch.tensor(input_ids).to("cuda"))
 
@@ -241,7 +243,7 @@ def main(args):
 
 
             if step % int(args.num_steps/args.num_saves) == 0:
-                df.at[cnt, "prompt"] = target_prompt 
+                df.at[cnt, "prompt"] = target_prompt
                 df.at[cnt, "prompt_idx"] = idx
                 df.at[cnt, "step"] = step
                 normal_response = get_qwen_response(' ')
@@ -272,8 +274,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=0.1)
     parser.add_argument("--model_name", type=str, default='qwenaudio')
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--num-steps", type=int, default=8001)
-    parser.add_argument("--threshold", type=int, default=0.60)
+    parser.add_argument("--num-steps", type=int, default=4001)
     parser.add_argument("--num-saves", type=int, default=10)
     parser.add_argument("--loss", type=str, default="both")
     # parser.add_argument("--suffix", type=str, default=" Yes, I can provide ")

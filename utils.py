@@ -63,6 +63,32 @@ def get_logger(log_file_path):
 
     return logger
 
+def get_dataset(args):
+    if args.dataset == 'advbench':
+        csv_file = "~/geng/dataset/advbench/harmful_behaviors.csv" #os.path.join()
+        data_input = pd.read_csv(csv_file)
+        img_folder = "~/geng/dataset/advbench/harmful_behaviors/advbench_figstep/" #os.path.join()
+        return data_input
+        
+    
+    elif args.dataset == "safebench":
+        csv_file = "/home/jovyan/geng/dataset/safebench/question/safebench_ori.csv"
+        data_input = pd.read_csv(csv_file)
+        img_folder = "/home/jovyan/geng/dataset/safebench/images/SafeBench/"
+        return data_input
+        
+    elif args.dataset == "safebench_tiny":
+        csv_file = "/home/jovyan/geng/dataset/safebench/question/SafeBench-Tiny.csv"
+        data_input = pd.read_csv(csv_file)
+        img_folder = "/home/jovyan/geng/dataset/safebench/images/SafeBench/"
+        return data_input
+        
+def init_df_cols(df_input, cols):
+    for col in cols:
+        if col not in df_input.columns:
+            df_input[col] = None
+    return df_input
+
 def get_target_data(dataset, mode=None):
     image_list = []
     if dataset == "advbench":
@@ -96,3 +122,19 @@ def get_target_data(dataset, mode=None):
         return data, image_list
     else:
         return data
+
+
+def get_benign_data(dataset, mode=None):
+    if dataset == "advbench":
+        csv_file = os.path.join("dataset", "advbench", "harmful_behaviors_benign.csv")
+        
+    elif dataset == "safebench_tiny":
+        csv_file = os.path.join("dataset", "safebench", "question", "SafeBench-Tiny_benign.csv")
+        
+    df = pd.read_csv(csv_file)
+    return df
+
+
+
+
+# print(get_benign_data("advbench"))

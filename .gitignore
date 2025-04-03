@@ -1,6 +1,9 @@
 .idea/
 __pycache__/
 exps/
+.ipynb_checkpoints/
+*.csv
+*.xlsx
 input_audios.bin
 input_ids.bin
 predict_noaudio.py
